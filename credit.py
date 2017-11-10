@@ -134,7 +134,8 @@ mean_amount2 = t['amount'].mean()
 # NEWBALANCEORIG qui s'explique par les opérations entre ces deux colonnes.
 ### Cependant à première vue il n'y a pas de relation linéaire entre les deux 
 # variables OLDBLANCEDEST et NEWBALANCEDEST
-plt.plot(fichier_credit.iloc[:,5], fichier_credit.iloc[:,4])
+
+plt.plot(fichier_credit.iloc[:,4], fichier_credit.iloc[:,5])
 plt.xlabel('OLDBALANCEORIG')
 plt.ylabel('NEWBALANCEORIG')
 
