@@ -19,6 +19,10 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Librairies de selection de variables
+from sklearn import preprocessing
+from sklearn.feature_selection import chi2, mutual_info_classif
+
 # Librairies de machine learning
 from sklearn.linear_model import LinearRegression
 from sklearn.cross_validation import train_test_split
@@ -35,10 +39,7 @@ import re
 ###############################################################################
 
 # Récupération du fichier
-user = "mrahari.TECH"
-disk_space = "C:/Users/"
-path = disk_space + user +"/Desktop/creditFraud/data/paysim-data.csv"
-fichier_credit = pd.read_csv(path)
+fichier_credit = pd.read_csv("C:/Users/cvancauwenberghe/Downloads/credit.csv")
 
 # Extraction des 100 premières lignes pour faciliter le chargement
 fichier_credit = fichier_credit.head(100)
@@ -85,6 +86,9 @@ fichier_credit.info()
 # Vérifier qu'il n'y a pas de valeurs nulles
 fichier_credit.isnull().values.any()
 
+# Voir un extrait du fichier
+fichier_credit.head()
+
 # Description du fichier
 description = fichier_credit.describe()
 
@@ -92,7 +96,7 @@ description = fichier_credit.describe()
 transactions = fichier_credit.type.drop_duplicates().values
 
 # On regarde quelle type de transaction sont sujettes aux fraudes.
-print('\n The types of fraudulent transactions are {}'.format(\
+print('\n Les types de transactions frauduleuses sont {}'.format(\
 list(fichier_credit.loc[fichier_credit.isFraud == 1].type.drop_duplicates().values)))
 
 # On compte le nombre de transaction frauduleuse pour les transferts
@@ -113,6 +117,15 @@ print((fichier_credit['isFraud']==1).value_counts())
 print(pd.crosstab(fichier_credit['isFraud'],fichier_credit['type']))
 
 
+min_amount = min(fichier_credit['amount'])
+max_amount = max(fichier_credit['amount'])
+mean_amount = fichier_credit['amount'].mean()
+std_amount = fichier_credit['amount'].std()
+t = fichier_credit.loc[(fichier_credit.isFraud == 1)]
+min_amount2 = min(t['amount'])
+mean_amount2 = t['amount'].mean()
+
+
 ###############################################################################
 ###       PARTIE VISUALISATION AVANT TRANSFORMATION DU JEU DE DONNEES       ###
 ###############################################################################
@@ -121,7 +134,7 @@ print(pd.crosstab(fichier_credit['isFraud'],fichier_credit['type']))
 # NEWBALANCEORIG qui s'explique par les opérations entre ces deux colonnes.
 ### Cependant à première vue il n'y a pas de relation linéaire entre les deux 
 # variables OLDBLANCEDEST et NEWBALANCEDEST
-plt.plot(fichier_credit.iloc[:,3], fichier_credit.iloc[:,4])
+plt.plot(fichier_credit.iloc[:,5], fichier_credit.iloc[:,4])
 plt.xlabel('OLDBALANCEORIG')
 plt.ylabel('NEWBALANCEORIG')
 
@@ -140,7 +153,7 @@ fichier_credit.hist(column='isFraud')
 fichier_credit.hist(column='type',by='isFraud')
 
 # Comparaison des distributions avec un boxplot
-fichier_credit.boxplot(column='type',by='isFraud')
+fichier_credit.boxplot(column='amount',by='isFraud')
 
 # Création d'un nuage de point
 fichier_credit.plot.scatter(x='type',y='isFraud',c='isFraud')
@@ -158,8 +171,6 @@ pd.tools.plotting.scatter_matrix(
 ###                   PARTIE ENRICHISSEMENT ET NETTOYAGE                    ###
 ###############################################################################
 
-a = fichier_credit
-
 # Création d'une colonne pour récupérer la première lettre du nom de l'envoyeur
 fichier_credit['FirstnameOrig'] = fichier_credit['nameOrig'].apply(
         recuperer_premiere_lettre)
@@ -168,18 +179,48 @@ fichier_credit['FirstnameOrig'] = fichier_credit['nameOrig'].apply(
 fichier_credit['FirstnameDest'] = fichier_credit['nameDest'].apply(
         recuperer_premiere_lettre)
 
+# Processus de transformation de variables non numériques
+le = preprocessing.LabelEncoder()
+# Application des labels à la colonne type
+fichier_credit['type_num'] = le.fit(fichier_credit['type'])
+# Vérification des classes de la colonne type
+list(le.classes_)
+# Transformation des variables non numérique en variables numériques
+fichier_credit['type_num'] = le.transform(fichier_credit['type'])
+### Si on veut réinverser le processus 
+# g = list(le.inverse_transform(fichier_credit['type_num']))
+
+fi = fichier_credit
+del fi['type']
+del fi['nameOrig']
+del fi['nameDest']
+del fi['FirstnameOrig']
+del fi['FirstnameDest']
+
 
 ###############################################################################
 ###       PARTIE VISUALISATION APRES TRANSFORMATION DU JEU DE DONNEES       ###
 ###############################################################################
 
+### Histogramme suite à l'ajout de colonne contenant la première lettre
+# Histogramme sur les receveurs
+fichier_credit.hist(column='FirstnameOrig',by='isFraud')
+
+# Histogramme sur les receveurs
+fichier_credit.hist(column='FirstnameDest',by='isFraud')
 
 
 ###############################################################################
 ###                         SELECTION DES VARIABLES                         ###
 ###############################################################################
 
+### Il n'y a aucune valeur ajoutée sur les envoyeurs, que ce soit via le 
+# matricule en entier ou bien la première lettre.
+### 
 
+
+r = chi2(fi, fi['isFraud'])
+r2 = mutual_info_classif(fi, fi['isFraud'])
 
 ###############################################################################
 ###                             CHOIX DU MODELE                             ###
@@ -197,7 +238,7 @@ knn = KNeighborsClassifier(n_neighbors=5)
 
 # Découpage du jeu de données en deux parties
 X_train, X_test, y_train, y_test = train_test_split(
-        fichier_credit.data, fichier_credit.isFraud, test_size=0.4)
+        fichier_credit, fichier_credit.isFraud, test_size=0.4)
 
 # Application du modèle sur le modèle d'entrainement
 knn.fit(X_train, y_train)
