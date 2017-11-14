@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 import scipy as sc
 from scipy.cluster.hierarchy import dendrogram, linkage
+from sklearn.preprocessing import normalize
 
 # Librairies de visualisation
 import matplotlib.pyplot as plt
@@ -63,8 +64,8 @@ n_colonnes = n[1]
 ### OLDBLANCEDEST : Bilan initial avant la transaction du receveur
 ### NEWBALANCEDEST :	 Nouveau bilan après la transaction du receveur
 ### ISFRAUD : Transactions tests simulées qui ont abouties ou non à une fraude.
-# La fraude est faite par les receveurs.
-### ISFLAGGEDFRAUD : Test d'un modèle de la fraude ou non.
+# La fraude est faite sur le compte des émetteurs.
+### ISFLAGGEDFRAUD : Mis à 1 si la fraude est supérieure à 200.000€
 
 
 ###############################################################################
@@ -104,11 +105,14 @@ nbFraudTransfert = len(fichier_credit.loc[(fichier_credit.isFraud == 1) &
                                    (fichier_credit.type == 'TRANSFER')])
 print('Nb de personnes ayant fait une fraude sur les transferts : ' 
       + str(nbFraudTransfert) + '')
+# 4116 cash out ont subi une fraude
+
 # On compte le nombre de transaction frauduleuse pour le cash
 nbCashTransfert = len(fichier_credit.loc[(fichier_credit.isFraud == 1) & 
                                    (fichier_credit.type == 'CASH_OUT')])
 print("Nb de personnes ayant fait une fraude sur la monnaie : " 
       + str(nbCashTransfert) + "")
+# 4097 transferts ont subi une fraude
 
 # Nombre de personnes ayant fraudés
 print((fichier_credit['isFraud']==1).value_counts())
