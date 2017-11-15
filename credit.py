@@ -9,6 +9,10 @@ JEU DE DONNEES CREDIT
 ###                          LIBRAIRIES A UTILISER                          ###
 ###############################################################################
 
+### Pour installer une libairie inexistante sur Anaconda, aller dans l'invite 
+# de commande d'Anaconda et écrire :
+# pip install nom_de_la_librairie
+
 # Librairies de manipulation de données
 import pandas as pd
 import numpy as np
@@ -19,6 +23,10 @@ from sklearn.preprocessing import normalize
 # Librairies de visualisation
 import matplotlib.pyplot as plt
 import seaborn as sns
+import ggplot
+
+# Librairies de construction de graphes
+import networkx as nx
 
 # Librairies de selection de variables
 from sklearn import preprocessing
@@ -63,8 +71,8 @@ n_colonnes = n[1]
 ### NAMEDEST	 : Personne/organisme qui recoit la transaction
 ### OLDBLANCEDEST : Bilan initial avant la transaction du receveur
 ### NEWBALANCEDEST :	 Nouveau bilan après la transaction du receveur
-### ISFRAUD : Transactions tests simulées qui ont abouties ou non à une fraude.
-# La fraude est faite sur le compte des émetteurs.
+### ISFRAUD : Fraude effectuée sur les comtpes des émetteurs et recepteurs.
+# Dans la suite du document, le mot "fraude" va être utilisé pour cette colonne
 ### ISFLAGGEDFRAUD : Mis à 1 si la fraude est supérieure à 200.000€
 
 
@@ -114,20 +122,22 @@ print("Nb de personnes ayant fait une fraude sur la monnaie : "
       + str(nbCashTransfert) + "")
 # 4097 transferts ont subi une fraude
 
+# Récupération des lignes où il y a eu fraude
+ligne_fraude = fichier_credit.loc[(fichier_credit.isFraud == 1)]
+# Moyenne du montant lorsqu'il y a fraude : 1 467 967 €
+moy_montant_fraude = ligne_fraude['amount'].mean()
+# Max du montant lorsqu'il y a fraude : 10 000 000 €
+max_montant_fraude = max(ligne_fraude['amount'])
+# Std du montant lorsqu'il y a fraude : 2 404 252 €
+std_montant_fraude = ligne_fraude['amount'].std()
+
 # Nombre de personnes ayant fraudés
 print((fichier_credit['isFraud']==1).value_counts())
 
 # Nombre de personnes ayant fraudés en fonction du type de paiement
 print(pd.crosstab(fichier_credit['isFraud'],fichier_credit['type']))
 
-
-min_amount = min(fichier_credit['amount'])
-max_amount = max(fichier_credit['amount'])
-mean_amount = fichier_credit['amount'].mean()
-std_amount = fichier_credit['amount'].std()
-t = fichier_credit.loc[(fichier_credit.isFraud == 1)]
-min_amount2 = min(t['amount'])
-mean_amount2 = t['amount'].mean()
+print(pd.crosstab(fichier_credit['isFraud'],fichier_credit['amount']))
 
 
 ###############################################################################
@@ -156,6 +166,13 @@ plt.ylabel('NEWBALANCEORIG')
 # Création d'histogramme
 fichier_credit.hist(column='isFraud')
 fichier_credit.hist(column='type',by='isFraud')
+
+# Distribution loi normale
+data = fichier_credit['amount']
+plt.hist(data, normed=1, color = "blue")
+plt.title('Distribution standard normale sur le montant')
+plt.grid()
+plt.show()
 
 # Comparaison des distributions avec un boxplot
 fichier_credit.boxplot(column='amount',by='isFraud')
