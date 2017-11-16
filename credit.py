@@ -188,6 +188,14 @@ fichier_credit['type'].value_counts().plot.pie()
 pd.tools.plotting.scatter_matrix(
         fichier_credit.select_dtypes(exclude=['object']))
 
+# Fonction de répartition cumulative
+hist, bin_edges = np.histogram(fichier_credit['amount'], normed=True)
+dx = bin_edges[1] - bin_edges[0]
+a = np.cumsum(hist)*dx
+plt.plot(bin_edges[1:], a)
+plt.xlabel("Montant")
+plt.ylabel("Transactions cumulées normées")
+
 
 ###############################################################################
 ###                   PARTIE ENRICHISSEMENT ET NETTOYAGE                    ###
