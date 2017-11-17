@@ -16,14 +16,13 @@ JEU DE DONNEES CREDIT
 # Librairies de manipulation de données
 import pandas as pd
 import numpy as np
-import scipy as sc
 from scipy.cluster.hierarchy import dendrogram, linkage
-from sklearn.preprocessing import normalize
 
 # Librairies de visualisation
 import matplotlib.pyplot as plt
 import seaborn as sns
-import ggplot
+from sklearn.decomposition import PCA
+import prince
 
 # Librairies de construction de graphes
 import networkx as nx
@@ -174,8 +173,13 @@ plt.title('Distribution standard normale sur le montant')
 plt.grid()
 plt.show()
 
-# Comparaison des distributions avec un boxplot
-fichier_credit.boxplot(column='amount',by='isFraud')
+### Comparaison des distributions avec un boxplot
+# Boxplot sur toute les variables contenant des variables quantitatives
+sns.boxplot(data=fichier_credit, orient="h", palette="Set2")
+# Boxplot sur le montant
+sns.boxplot(x=fichier_credit["amount"])
+# Boxplot sur le montant en fonction de la fraude
+sns.boxplot(x="isFraud", y="amount", data=fichier_credit, order=[0, 1])
 
 # Création d'un nuage de point
 fichier_credit.plot.scatter(x='type',y='isFraud',c='isFraud')
@@ -196,36 +200,62 @@ plt.plot(bin_edges[1:], a)
 plt.xlabel("Montant")
 plt.ylabel("Transactions cumulées normées")
 
+### Méthode d'Analyse en Composantes Principales
+X = fichier_credit[['amount', 'oldbalanceOrg', 'newbalanceOrig', 
+                    'oldbalanceDest', 'newbalanceDest']]
+Y = fichier_credit['isFraud']
+target_name = ['turquoise', 'navy']
+# définition de la commande
+pca = PCA()
+# Estimation, calcul des composantes principales
+C = pca.fit(X).transform(X)
+# Explication du pourcentage de variance de chaque variable
+print('Explication du pourcentage de variance de chaque variable: %s'
+      % str(pca.explained_variance_ratio_))
+# Décroissance de la variance expliquée
+plt.plot(pca.explained_variance_ratio_)
+# Affichage graphique
+plt.boxplot(C[:,0:5])
+plt.scatter(C[:,0], C[:,1], c=target_name, label=[0,1])
+
+# Cercle des corrélations
+cercle = prince.PCA(X, n_components=2)
+cercle.plot_correlation_circle()
 
 ###############################################################################
 ###                   PARTIE ENRICHISSEMENT ET NETTOYAGE                    ###
 ###############################################################################
 
 # Création d'une colonne pour récupérer la première lettre du nom de l'envoyeur
-fichier_credit['FirstnameOrig'] = fichier_credit['nameOrig'].apply(
+fichier_credit['nameOrig'] = fichier_credit['nameOrig'].apply(
         recuperer_premiere_lettre)
 
 # Création d'une colonne pour récupérer la première lettre du nom du receveur
-fichier_credit['FirstnameDest'] = fichier_credit['nameDest'].apply(
+fichier_credit['nameDest'] = fichier_credit['nameDest'].apply(
         recuperer_premiere_lettre)
 
-# Processus de transformation de variables non numériques
+### Processus de transformation de variables non numériques
 le = preprocessing.LabelEncoder()
 # Application des labels à la colonne type
-fichier_credit['type_num'] = le.fit(fichier_credit['type'])
+le.fit(fichier_credit['type'])
 # Vérification des classes de la colonne type
 list(le.classes_)
 # Transformation des variables non numérique en variables numériques
-fichier_credit['type_num'] = le.transform(fichier_credit['type'])
+fichier_credit['type'] = le.transform(fichier_credit['type'])
 ### Si on veut réinverser le processus 
 # g = list(le.inverse_transform(fichier_credit['type_num']))
 
-fi = fichier_credit
-del fi['type']
-del fi['nameOrig']
-del fi['nameDest']
-del fi['FirstnameOrig']
-del fi['FirstnameDest']
+### Emetteur
+# Application des labels à la colonne emetteur
+le.fit(fichier_credit['nameOrig'])
+# Transformation des variables non numérique en variables numériques
+fichier_credit['nameOrig'] = le.transform(fichier_credit['nameOrig'])
+
+### Receveur
+# Application des labels à la colonne receveur
+le.fit(fichier_credit['nameDest'])
+# Transformation des variables non numérique en variables numériques
+fichier_credit['nameDest'] = le.transform(fichier_credit['nameDest'])
 
 
 ###############################################################################
@@ -249,8 +279,8 @@ fichier_credit.hist(column='FirstnameDest',by='isFraud')
 ### 
 
 
-r = chi2(fi, fi['isFraud'])
-r2 = mutual_info_classif(fi, fi['isFraud'])
+r = chi2(fichier_credit, fichier_credit['isFraud'])
+r2 = mutual_info_classif(fichier_credit, fichier_credit['isFraud'])
 
 ###############################################################################
 ###                             CHOIX DU MODELE                             ###
@@ -260,7 +290,8 @@ r2 = mutual_info_classif(fi, fi['isFraud'])
 lr = LinearRegression(normalize=True)
 # Méthode KNN - voisins = 
 knn = KNeighborsClassifier(n_neighbors=5)
-
+# Méthode Forets aléatoires
+rf = RandomForestClassifier()
 
 ###############################################################################
 ###                           VALIDATION DU MODELE                          ###
