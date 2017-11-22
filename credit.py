@@ -152,10 +152,6 @@ plt.plot(fichier_credit.iloc[:,4], fichier_credit.iloc[:,5])
 plt.xlabel('OLDBALANCEORIG')
 plt.ylabel('NEWBALANCEORIG')
 
-# sns.set(style="ticks")
-# df = sns.load_dataset("fichier_credit")
-# sns.pairplot(df, hue="species")
-
 # Z = linkage(fichier_credit, 'ward')
 # plt.scatter(fichier_credit[:, 4], 
 #             fichier_credit[:, 5], 
