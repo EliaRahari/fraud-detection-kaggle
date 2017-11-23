@@ -16,7 +16,7 @@ JEU DE DONNEES CREDIT
 # Librairies de manipulation de données
 import pandas as pd
 import numpy as np
-from scipy.cluster.hierarchy import dendrogram, linkage
+# from scipy.cluster.hierarchy import dendrogram, linkage
 
 # Librairies de visualisation
 import matplotlib.pyplot as plt
@@ -25,11 +25,12 @@ from sklearn.decomposition import PCA
 import prince
 
 # Librairies de construction de graphes
-import networkx as nx
+# import networkx as nx
 
 # Librairies de selection de variables
 from sklearn import preprocessing
-from sklearn.feature_selection import chi2, mutual_info_classif
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
 
 # Librairies de machine learning
 from sklearn.linear_model import LinearRegression
@@ -37,6 +38,7 @@ from sklearn.cross_validation import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.cluster import KMeans
 
 # Librairies pour les regex
 import re
@@ -50,7 +52,7 @@ import re
 fichier_credit = pd.read_csv("C:/Users/cvancauwenberghe/Downloads/credit.csv")
 
 # Extraction des 100 premières lignes pour faciliter le chargement
-fichier_credit = fichier_credit.head(100)
+# fichier_credit = fichier_credit.head(100)
 
 # Récupération du nom des colonnes dans un dataframe
 colonne_credit = pd.DataFrame(fichier_credit.columns)
@@ -178,15 +180,15 @@ sns.boxplot(x=fichier_credit["amount"])
 sns.boxplot(x="isFraud", y="amount", data=fichier_credit, order=[0, 1])
 
 # Création d'un nuage de point
-fichier_credit.plot.scatter(x='type',y='isFraud',c='isFraud')
+# fichier_credit.plot.scatter(x='type',y='isFraud',c='isFraud')
 
 # Camembert sur la représentation des types
 fichier_credit['type'].value_counts().plot.pie()
 
 # Equivalent de pairs de R - affichage des données
 # Cela n'a d'intérêt que pour les variables quantitatives 
-pd.tools.plotting.scatter_matrix(
-        fichier_credit.select_dtypes(exclude=['object']))
+# pd.tools.plotting.scatter_matrix(
+#         fichier_credit.select_dtypes(exclude=['object']))
 
 # Fonction de répartition cumulative
 hist, bin_edges = np.histogram(fichier_credit['amount'], normed=True)
@@ -216,7 +218,8 @@ plt.scatter(C[:,0], C[:,1], c=target_name, label=[0,1])
 
 # Cercle des corrélations
 cercle = prince.PCA(X, n_components=2)
-cercle.plot_correlation_circle()
+# cercle.plot_correlation_circle()
+
 
 ###############################################################################
 ###                   PARTIE ENRICHISSEMENT ET NETTOYAGE                    ###
@@ -260,10 +263,10 @@ fichier_credit['nameDest'] = le.transform(fichier_credit['nameDest'])
 
 ### Histogramme suite à l'ajout de colonne contenant la première lettre
 # Histogramme sur les receveurs
-fichier_credit.hist(column='FirstnameOrig',by='isFraud')
+fichier_credit.hist(column='nameOrig',by='isFraud')
 
 # Histogramme sur les receveurs
-fichier_credit.hist(column='FirstnameDest',by='isFraud')
+fichier_credit.hist(column='nameDest',by='isFraud')
 
 
 ###############################################################################
@@ -274,9 +277,25 @@ fichier_credit.hist(column='FirstnameDest',by='isFraud')
 # matricule en entier ou bien la première lettre.
 ### 
 
+### Utilisation de la méthode du Chi2
+# amount, oldbalanceDest, newbalanceDest sont les colonnes choisies
+X_new = SelectKBest(chi2, k=3).fit_transform(X, Y)
+### Utilisation de l'information mutuelle
+# amount, oldbalanceOrg et newbalanceDest sont les colonnes choisies
+r = mutual_info_classif(X, fichier_credit['isFraud'])
+### Utilisation de la méthode supprimant les variances basses
+# amount, oldbalanceOrg et newbalanceOrig sont les colonnes choisies
+sel = VarianceThreshold(threshold=np.var(X))
+r2 = sel.fit_transform(X)
 
-r = chi2(fichier_credit, fichier_credit['isFraud'])
-r2 = mutual_info_classif(fichier_credit, fichier_credit['isFraud'])
+### Il semblerait que les colonnes amount et oldbalanceOrg
+# Soients les colonnes à selectionner. 
+# (a voir en plus avec le cercle des corrélations)
+# type également 
+
+### On selectionne donc les variables amount, oldbalanceOrg et type
+X_choisies = fichier_credit[['amount', 'oldbalanceOrg', 'type']]
+
 
 ###############################################################################
 ###                             CHOIX DU MODELE                             ###
@@ -284,46 +303,63 @@ r2 = mutual_info_classif(fichier_credit, fichier_credit['isFraud'])
 
 # Méthode Régression Linéaire
 lr = LinearRegression(normalize=True)
-# Méthode KNN - voisins = 
+# Méthode KNN
 knn = KNeighborsClassifier(n_neighbors=5)
 # Méthode Forets aléatoires
 rf = RandomForestClassifier()
+# Méthode Kmeans - non-supervisé
+kmeans = KMeans(n_clusters=2, random_state=0)
+
 
 ###############################################################################
 ###                           VALIDATION DU MODELE                          ###
 ###############################################################################
 
+
+X_choix = fichier_credit[['amount', 'oldbalanceOrg', 'type', 'isFraud']]
+
 # Découpage du jeu de données en deux parties
 X_train, X_test, y_train, y_test = train_test_split(
-        fichier_credit, fichier_credit.isFraud, test_size=0.4)
+        X_choix, X_choix.isFraud, test_size=0.4)
 
+### Méthode KNN
 # Application du modèle sur le modèle d'entrainement
-knn.fit(X_train, y_train)
-
+m_knn = knn.fit(X_train, y_train)
 # Utilisation des prédictions sur le jeu de données test
-y_pred = knn.predict(X_test)
-
+y_pred_knn = m_knn.predict(X_test)
 ### Création d'une matrice de confusion pour afficher la relation entre les
 # prédictions et le réel
-confusion_matrix(y_test, y_pred)
+cf_knn = confusion_matrix(y_test, y_pred_knn)
 
+### Méthode Régression Linéaire
+# Application du modèle sur le modèle d'entrainement
+m_lr = lr.fit(X_train, y_train)
+# Utilisation des prédictions sur le jeu de données test
+y_pred_lr = m_lr.predict(X_test)
+### Création d'une matrice de confusion pour afficher la relation entre les
+# prédictions et le réel
+cf_lr = confusion_matrix(y_test, y_pred_lr.round())
 
+### Méthode Random Forest
+# Application du modèle sur le modèle d'entrainement
+m_rf = rf.fit(X_train, y_train)
+# Utilisation des prédictions sur le jeu de données test
+y_pred_rf = m_rf.predict(X_test)
+### Création d'une matrice de confusion pour afficher la relation entre les
+# prédictions et le réel
+cf_rf = confusion_matrix(y_test, y_pred_rf)
+
+### Méthode KMeans
+m_kmeans = kmeans.fit(X_choix)
+l = kmeans.labels_
 
 
 ###############################################################################
-###                    AFFICHAGE DES RESULTATS DU MODELE                    ###
+###                            RESULTATS DU MODELE                          ###
 ###############################################################################
 
-
-
-
-###############################################################################
-###                                   TEST                                  ###
-###############################################################################
-
-
-
-
+### Le modèle qui fonctionne le mieux est le modèle 
+# Régression Linaire/Random Forest
 
 
 
