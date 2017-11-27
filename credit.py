@@ -222,6 +222,37 @@ cercle = prince.PCA(X, n_components=2)
 # cercle.plot_correlation_circle()
 
 """
+
+# Visualisation de la matrice de corrélation
+corr = (fichier_credit[['amount',
+                        'oldbalanceOrg',
+                        'newbalanceOrig',
+                        'oldbalanceDest',
+                        'newbalanceDest']]
+                        .corr()
+                        )
+
+f, ax = plt.subplots(figsize=(10, 8))
+
+(sns
+   .heatmap(corr,
+            mask=np.zeros_like(corr, dtype=np.bool),
+            cmap=sns.diverging_palette(220, 10, as_cmap=True),
+            square=True,
+            ax=ax)
+   )
+
+#Etude sur la variable temporelle "steps"
+distinct_step = fichier_credit['step'].unique()
+len(distinct_step)
+#743 steps
+
+#Sommes échangées chronologiquement
+amount_vs_time = fichier_credit.groupby('step').amount.sum().to_frame()
+amount_vs_time["date"] = amount_vs_time.index
+amount_vs_time.plot(x="date", y="amount")
+
+
 ###############################################################################
 ###                   PARTIE ENRICHISSEMENT ET NETTOYAGE                    ###
 ###############################################################################
