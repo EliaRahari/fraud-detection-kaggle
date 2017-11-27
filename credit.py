@@ -35,6 +35,7 @@ from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
 # Librairies de machine learning
 from sklearn.linear_model import LinearRegression
 from sklearn.cross_validation import train_test_split
+from sklearn. model_selection import KFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
@@ -52,7 +53,7 @@ import re
 fichier_credit = pd.read_csv("C:/Users/cvancauwenberghe/Downloads/credit.csv")
 
 # Extraction des 100 premières lignes pour faciliter le chargement
-# fichier_credit = fichier_credit.head(100)
+fichier_credit = fichier_credit.head(100)
 
 # Récupération du nom des colonnes dans un dataframe
 colonne_credit = pd.DataFrame(fichier_credit.columns)
@@ -89,7 +90,7 @@ def recuperer_premiere_lettre(cellule):
 ###############################################################################
 ###          PARTIE RECHERCHE D'INFORMATIONS SUR LE JEU DE DONNEES          ###
 ###############################################################################
-
+"""
 # Regarder les informations sur les données du jeu
 fichier_credit.info()
 
@@ -220,7 +221,7 @@ plt.scatter(C[:,0], C[:,1], c=target_name, label=[0,1])
 cercle = prince.PCA(X, n_components=2)
 # cercle.plot_correlation_circle()
 
-
+"""
 ###############################################################################
 ###                   PARTIE ENRICHISSEMENT ET NETTOYAGE                    ###
 ###############################################################################
@@ -272,7 +273,7 @@ fichier_credit.hist(column='nameDest',by='isFraud')
 ###############################################################################
 ###                         SELECTION DES VARIABLES                         ###
 ###############################################################################
-
+"""
 ### Il n'y a aucune valeur ajoutée sur les envoyeurs, que ce soit via le 
 # matricule en entier ou bien la première lettre.
 ### 
@@ -296,7 +297,7 @@ r2 = sel.fit_transform(X)
 ### On selectionne donc les variables amount, oldbalanceOrg et type
 X_choisies = fichier_credit[['amount', 'oldbalanceOrg', 'type']]
 
-
+"""
 ###############################################################################
 ###                             CHOIX DU MODELE                             ###
 ###############################################################################
@@ -353,6 +354,26 @@ cf_rf = confusion_matrix(y_test, y_pred_rf)
 m_kmeans = kmeans.fit(X_choix)
 l = kmeans.labels_
 
+### Validation croisée avec KFold
+# Choix du nombre de découpage
+kf = KFold(n_splits = 10)
+
+# Séparation entre les variables et la target
+X_kf = X_choix[['amount', 'oldbalanceOrg', 'type']]
+X_kf = X_kf.values
+Y_kf = pd.DataFrame(X_choix['isFraud'])
+Y_kf = Y_kf.values
+cf = np.asarray([[0,0],[0,0]])
+# Création de la boucle pour faire la validation croisée
+for train_index, test_index in kf.split(X_choix):    
+    X_train, X_test = X_kf[train_index], X_kf[test_index]
+    y_train, y_test = Y_kf[train_index], Y_kf[test_index]
+    mkf_knn = knn.fit(X_train, y_train)
+    ykf_pred_knn = m_knn.predict(X_test)
+    ckf_knn = confusion_matrix(y_test, y_pred_knn)
+    cf = cf + ckf_knn
+print(cf)   
+    
 
 ###############################################################################
 ###                            RESULTATS DU MODELE                          ###
