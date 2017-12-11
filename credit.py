@@ -40,6 +40,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
+from sklearn import metrics
+from scipy import interp
 
 # Librairies pour les regex
 import re
@@ -53,7 +55,7 @@ import re
 fichier_credit = pd.read_csv("C:/Users/cvancauwenberghe/Downloads/credit.csv")
 
 # Extraction des 100 premières lignes pour faciliter le chargement
-fichier_credit = fichier_credit.head(100)
+# fichier_credit = fichier_credit.head(100)
 
 # Récupération du nom des colonnes dans un dataframe
 colonne_credit = pd.DataFrame(fichier_credit.columns)
@@ -86,11 +88,80 @@ n_colonnes = n[1]
 def recuperer_premiere_lettre(cellule): 
     return re.sub(r"[0-9]", "", cellule)
 
+### Fonction du processus de transformation de variables non numériques
+def varNum_into_varNoNum(colonneNum):
+    le = preprocessing.LabelEncoder()
+    # Application des labels à la colonne type
+    le.fit(colonneNum)
+    # Vérification des classes de la colonne type
+    # list(le.classes_)
+    # Transformation des variables non numérique en variables numériques
+    colonneNum = le.transform(colonneNum) 
+    
+# Fonction de validation simple
+def validation_simple(modele):
+    mat = np.asarray([[0,0],[0,0]])
+    # Application du modèle sur le modèle d'entrainement
+    mod = modele.fit(X_train, y_train)
+    # Utilisation des prédictions sur le jeu de données test
+    y_pred_knn = mod.predict(X_test)
+    ### Création d'une matrice de confusion pour afficher la relation entre les
+    # prédictions et le réel
+    # y_pred_lr.round()
+    mat = confusion_matrix(y_test, y_pred_knn)
+    print(mat)
+
+# Fonction de validation croisée
+def validation_croisee(modele): 
+    # Séparation entre les variables et la target
+    X_kf = X_choix[['amount', 'oldbalanceOrg', 'type']]
+    X_kf = X_kf.values
+    Y_kf = pd.DataFrame(X_choix['isFraud'])
+    Y_kf = Y_kf.values
+    cf = np.asarray([[0,0],[0,0]])
+    recall = np.asarray([[0,0],[0,0]])
+    precision = np.asarray([[0,0],[0,0]])
+    base_fpr = np.linspace(0, 1, 101)
+    tprs = []
+    # Création de la boucle pour faire la validation croisée
+    for train_index, test_index in kf.split(X_choix):    
+        X_train, X_test = X_kf[train_index], X_kf[test_index]
+        y_train, y_test = Y_kf[train_index], Y_kf[test_index]
+        mod = modele.fit(X_train, y_train.ravel())
+        y_pred_knn = mod.predict(X_test)
+        ckf_knn = confusion_matrix(y_test, y_pred_knn)
+        ckf_knn = confusion_matrix(y_test, y_pred_knn.round())
+        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_pred_knn.ravel(), pos_label=2)
+        cf = cf + ckf_knn
+        rec = metrics.recall_score(y_test, y_pred_knn.round(), average='weighted')
+        recall = recall + rec
+        pre = metrics.precision_score(y_test, y_pred_knn, average='weighted')
+        precision = precision + pre
+        fpr, tpr, _ = metrics.roc_curve(y_test, y_pred_knn)
+        plt.plot(fpr, tpr, 'b', alpha=0.15)
+        tpr = interp(base_fpr, fpr, tpr)
+        tpr[0] = 0.0
+        tprs.append(tpr)
+    tprs = np.array(tprs)
+    mean_tprs = tprs.mean(axis=0)
+    std = tprs.std(axis=0)   
+    tprs_upper = np.minimum(mean_tprs + std, 1)
+    tprs_lower = mean_tprs - std     
+    plt.plot(base_fpr, mean_tprs, 'b')
+    plt.fill_between(base_fpr, tprs_lower, tprs_upper, color='grey', alpha=0.3)    
+    plt.plot([0, 1], [0, 1],'r--')
+    plt.xlim([-0.01, 1.01])
+    plt.ylim([-0.01, 1.01])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.axes().set_aspect('equal', 'datalim')
+    plt.show()
+
 
 ###############################################################################
 ###          PARTIE RECHERCHE D'INFORMATIONS SUR LE JEU DE DONNEES          ###
 ###############################################################################
-"""
+
 # Regarder les informations sur les données du jeu
 fichier_credit.info()
 
@@ -160,7 +231,6 @@ plt.ylabel('NEWBALANCEORIG')
 #             fichier_credit[:, 5], 
 #             c=fichier_credit.isFraud)
 
-
 # Création d'histogramme
 fichier_credit.hist(column='isFraud')
 fichier_credit.hist(column='type',by='isFraud')
@@ -221,7 +291,7 @@ plt.scatter(C[:,0], C[:,1], c=target_name, label=[0,1])
 cercle = prince.PCA(X, n_components=2)
 # cercle.plot_correlation_circle()
 
-"""
+
 
 # Visualisation de la matrice de corrélation
 corr = (fichier_credit[['amount',
@@ -265,34 +335,6 @@ fichier_credit['nameOrig'] = fichier_credit['nameOrig'].apply(
 fichier_credit['nameDest'] = fichier_credit['nameDest'].apply(
         recuperer_premiere_lettre)
 
-### Processus de transformation de variables non numériques
-le = preprocessing.LabelEncoder()
-# Application des labels à la colonne type
-le.fit(fichier_credit['type'])
-# Vérification des classes de la colonne type
-list(le.classes_)
-# Transformation des variables non numérique en variables numériques
-fichier_credit['type'] = le.transform(fichier_credit['type'])
-### Si on veut réinverser le processus 
-# g = list(le.inverse_transform(fichier_credit['type_num']))
-
-### Emetteur
-# Application des labels à la colonne emetteur
-le.fit(fichier_credit['nameOrig'])
-# Transformation des variables non numérique en variables numériques
-fichier_credit['nameOrig'] = le.transform(fichier_credit['nameOrig'])
-
-### Receveur
-# Application des labels à la colonne receveur
-le.fit(fichier_credit['nameDest'])
-# Transformation des variables non numérique en variables numériques
-fichier_credit['nameDest'] = le.transform(fichier_credit['nameDest'])
-
-
-###############################################################################
-###       PARTIE VISUALISATION APRES TRANSFORMATION DU JEU DE DONNEES       ###
-###############################################################################
-
 ### Histogramme suite à l'ajout de colonne contenant la première lettre
 # Histogramme sur les receveurs
 fichier_credit.hist(column='nameOrig',by='isFraud')
@@ -300,11 +342,19 @@ fichier_credit.hist(column='nameOrig',by='isFraud')
 # Histogramme sur les receveurs
 fichier_credit.hist(column='nameDest',by='isFraud')
 
+# Transformation des variables
+# Type
+varNum_into_varNoNum(fichier_credit['type'])
+# Emetteur
+varNum_into_varNoNum(fichier_credit['nameOrig'])
+# Receveur
+varNum_into_varNoNum(fichier_credit['nameDest'])
+
 
 ###############################################################################
 ###                         SELECTION DES VARIABLES                         ###
 ###############################################################################
-"""
+
 ### Il n'y a aucune valeur ajoutée sur les envoyeurs, que ce soit via le 
 # matricule en entier ou bien la première lettre.
 ### 
@@ -328,7 +378,7 @@ r2 = sel.fit_transform(X)
 ### On selectionne donc les variables amount, oldbalanceOrg et type
 X_choisies = fichier_credit[['amount', 'oldbalanceOrg', 'type']]
 
-"""
+
 ###############################################################################
 ###                             CHOIX DU MODELE                             ###
 ###############################################################################
@@ -354,32 +404,11 @@ X_choix = fichier_credit[['amount', 'oldbalanceOrg', 'type', 'isFraud']]
 X_train, X_test, y_train, y_test = train_test_split(
         X_choix, X_choix.isFraud, test_size=0.4)
 
-### Méthode KNN
-# Application du modèle sur le modèle d'entrainement
-m_knn = knn.fit(X_train, y_train)
-# Utilisation des prédictions sur le jeu de données test
-y_pred_knn = m_knn.predict(X_test)
-### Création d'une matrice de confusion pour afficher la relation entre les
-# prédictions et le réel
-cf_knn = confusion_matrix(y_test, y_pred_knn)
+# Validation simple
+validation_simple(lr)
+validation_simple(knn)
+validation_simple(rf)
 
-### Méthode Régression Linéaire
-# Application du modèle sur le modèle d'entrainement
-m_lr = lr.fit(X_train, y_train)
-# Utilisation des prédictions sur le jeu de données test
-y_pred_lr = m_lr.predict(X_test)
-### Création d'une matrice de confusion pour afficher la relation entre les
-# prédictions et le réel
-cf_lr = confusion_matrix(y_test, y_pred_lr.round())
-
-### Méthode Random Forest
-# Application du modèle sur le modèle d'entrainement
-m_rf = rf.fit(X_train, y_train)
-# Utilisation des prédictions sur le jeu de données test
-y_pred_rf = m_rf.predict(X_test)
-### Création d'une matrice de confusion pour afficher la relation entre les
-# prédictions et le réel
-cf_rf = confusion_matrix(y_test, y_pred_rf)
 
 ### Méthode KMeans
 m_kmeans = kmeans.fit(X_choix)
@@ -388,30 +417,19 @@ l = kmeans.labels_
 ### Validation croisée avec KFold
 # Choix du nombre de découpage
 kf = KFold(n_splits = 10)
-
-# Séparation entre les variables et la target
-X_kf = X_choix[['amount', 'oldbalanceOrg', 'type']]
-X_kf = X_kf.values
-Y_kf = pd.DataFrame(X_choix['isFraud'])
-Y_kf = Y_kf.values
-cf = np.asarray([[0,0],[0,0]])
-# Création de la boucle pour faire la validation croisée
-for train_index, test_index in kf.split(X_choix):    
-    X_train, X_test = X_kf[train_index], X_kf[test_index]
-    y_train, y_test = Y_kf[train_index], Y_kf[test_index]
-    mkf_knn = knn.fit(X_train, y_train)
-    ykf_pred_knn = m_knn.predict(X_test)
-    ckf_knn = confusion_matrix(y_test, y_pred_knn)
-    cf = cf + ckf_knn
-print(cf)   
     
+ # Validation croisée   
+validation_croisee(lr)
+validation_croisee(knn)
+validation_croisee(rf)
+
 
 ###############################################################################
 ###                            RESULTATS DU MODELE                          ###
 ###############################################################################
 
 ### Le modèle qui fonctionne le mieux est le modèle 
-# Régression Linaire/Random Forest
+# KNN
 
 
 
